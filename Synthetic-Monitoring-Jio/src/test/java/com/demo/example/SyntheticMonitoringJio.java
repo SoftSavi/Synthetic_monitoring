@@ -39,7 +39,7 @@ public class SyntheticMonitoringJio {
 
     public static void main(String[] args) throws InterruptedException {
         try {
-            System.out.println("Job scheduled to run every 5 minutes.");
+            System.out.println("Job scheduled to run every 5 minutes   .");
 
             // Set up Quartz Job and Trigger for URL monitoring every 5 minutes
             JobDetail job = JobBuilder.newJob(UrlMonitoringJob.class)
