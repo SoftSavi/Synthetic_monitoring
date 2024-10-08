@@ -7,6 +7,7 @@ import io.restassured.response.Response;
 import org.openqa.selenium.*;
 import org.openqa.selenium.NoSuchElementException;
 import org.openqa.selenium.chrome.ChromeDriver;
+import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.edge.EdgeDriver;
 import org.openqa.selenium.firefox.FirefoxDriver;
 import org.openqa.selenium.support.ui.ExpectedConditions;
@@ -23,20 +24,21 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.*;
-import java.util.Base64;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.FileHandler;
-import java.util.logging.Logger;
-import java.util.logging.SimpleFormatter;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 public class SyntheticMonitoring {
 
     public static WebDriver driver;
-    private static Logger logger = Logger.getLogger("ResponseLog");
+    private static Logger logger = LogManager.getLogger(SyntheticMonitoring.class);
     private static final String SECRET_KEY = "pm#dds$rxz4jhsdt"; // AES-128 key (16 characters)
     private static String selectedBrowser = null;
 
     public static void main(String[] args) throws InterruptedException {
+    	
+    	 logger.info("This is a test log message.");
+    	
         try {
             System.out.println("Job scheduled to run every 5 minutes.");
 
@@ -48,7 +50,7 @@ public class SyntheticMonitoring {
             Trigger trigger = TriggerBuilder.newTrigger()
                     .withIdentity("urlTrigger", "group1")
                     .withSchedule(SimpleScheduleBuilder.simpleSchedule()
-                            .withIntervalInMinutes(5)
+                            .withIntervalInMinutes(10)
                             .repeatForever())
                     .build();
 
@@ -65,7 +67,7 @@ public class SyntheticMonitoring {
     }
 
     public void monitorUrls() throws InterruptedException, IOException {
-        setupLogger();
+  
 
         if (selectedBrowser == null) {
             System.out.println("What is your browser?");
@@ -102,8 +104,15 @@ public class SyntheticMonitoring {
     private static void initializeDriver(String browser) {
         if (browser.equalsIgnoreCase("chrome")) {
             System.setProperty("webdriver.chrome.driver",
-                    "E:\\AutomationTesting Projects\\Synthetic-Monitoring-Jio\\chromedriver.exe");
-            driver = new ChromeDriver();
+                    "C:\\Users\\savitri.patkare\\git\\Synthetic_monitoring\\Synthetic-Monitoring-Jio\\chromedriver.exe");
+            // Create ChromeOptions to manage notification pop-ups
+            ChromeOptions options = new ChromeOptions();
+            options.addArguments("--disable-notifications"); // Disables notifications
+            options.addArguments("--disable-popup-blocking"); // Disables popup blocking, if needed
+            options.addArguments("--start-maximized"); // Starts the browser maximized
+
+            driver = new ChromeDriver(options);
+            
         } else if (browser.equalsIgnoreCase("edge")) {
             System.setProperty("webdriver.edge.driver",
                     "D:\\UpdatedBasicAutomation\\JavaEmailSenderNew\\msedgedriver.exe");
@@ -116,82 +125,128 @@ public class SyntheticMonitoring {
             System.out.println("Unsupported browser! Defaulting to Chrome.");
             System.setProperty("webdriver.chrome.driver",
                     "E:\\AutomationTesting Projects\\Synthetic-Monitoring-Jio\\chromedriver.exe");
-            driver = new ChromeDriver();
+            // Create ChromeOptions to manage notification pop-ups
+            ChromeOptions options = new ChromeOptions();
+            options.addArguments("--disable-notifications"); // Disables notifications
+            options.addArguments("--disable-popup-blocking"); // Disables popup blocking, if needed
+            options.addArguments("--start-maximized"); // Starts the browser maximized
+
+            driver = new ChromeDriver(options);
         }
     }
 
     private static void processEntry(Map<String, Object> entry) throws InterruptedException {
         String baseUrl = (String) entry.get("url");
-        int expectedResponseTime = (int) entry.get("expectedResponseTime");
+        String applicationName = (String) entry.get("applicationName");
+
+        // Use Number to handle both Integer and Double
+        Number expectedResponseTimeNumber = (Number) entry.get("expectedResponseTime");
+        double expectedResponseTime = expectedResponseTimeNumber != null ? expectedResponseTimeNumber.doubleValue() : 0.0;
+
         int expectedResponseCode = (int) entry.get("expectedResponseCode");
         @SuppressWarnings("unchecked")
         List<String> expectedResponse = (List<String>) entry.get("expectedResponse");
 
         RestAssured.baseURI = baseUrl;
-        driver.get(RestAssured.baseURI);
-        driver.manage().timeouts().implicitlyWait(10, TimeUnit.SECONDS);
-        driver.manage().window().maximize();
 
-        boolean requiresCredentials = entry.containsKey("requiresCredentials") && (boolean) entry.get("requiresCredentials");
-
-        if (requiresCredentials) {
-            loadAndUseCredentials(entry); // Handle credentials
-        }
-
-        // Allow page to load completely
-        Thread.sleep(5000);
-
-        String currentUrl = driver.getCurrentUrl();
-        long responseTime = getResponseTime(currentUrl);
-        int responseCode = getResponseCode(currentUrl);
         StringBuilder emailBody = new StringBuilder();
+        boolean alertTriggered = false;
 
-        logger.info("URL: " + currentUrl);
+        try {
+            // Set a maximum time for the page to load (e.g., 30 seconds)
+            driver.manage().timeouts().pageLoadTimeout(60, TimeUnit.SECONDS);
 
-        // Check response time
-        if (responseTime > expectedResponseTime) {
-            logger.warning("Response time exceeded the expected range.");
-            emailBody.append("The response time exceeded the expected time.\n");
-        } else {
-            logger.info("Response time is within the expected range.");
-        }
+            driver.get(RestAssured.baseURI);  // Navigate to the URL
+            driver.manage().timeouts().implicitlyWait(10, TimeUnit.SECONDS);
 
-        // Check response code
-        logger.info("Response Code: " + responseCode);
-        if (responseCode == expectedResponseCode) {
-            logger.info("Response code matches the expected code.");
-        } else {
-            logger.warning("Response code does not match the expected code.");
-            emailBody.append("The response code did not match the expected code.\n" +
-                    "Expected Response Code: " + expectedResponseCode + "\n" +
-                    "Actual Response Code: " + responseCode + "\n");
-        }
+            driver.manage().window().maximize();
 
-        // Check expected content
-        String pageSource = driver.getPageSource();
-        boolean isMatchFound = false;
-        for (String expectedName : expectedResponse) {
-            if (pageSource.contains(expectedName)) {
-                logger.info("Match found in HTML: " + expectedName);
-                isMatchFound = true;
-                break;
+            logger.info("Navigating to URL: " + baseUrl);
+
+            boolean requiresCredentials = entry.containsKey("requiresCredentials") && (boolean) entry.get("requiresCredentials");
+            if (requiresCredentials) {
+                loadAndUseCredentials(entry); // Handle credentials if necessary
+            }
+
+            // Allow page to load completely
+            Thread.sleep(5000);
+
+            String currentUrl = driver.getCurrentUrl();
+            long responseTime = getResponseTime(currentUrl);
+            int responseCode = getResponseCode(currentUrl);
+
+            logger.info("URL: " + currentUrl);
+            
+           
+            // Build the email body
+            emailBody.append("=========================\n")
+                    .append("Alert Notification\n")
+                    .append("=========================\n")
+                    .append("Timestamp: ").append(new Date()).append("\n")
+                    .append("Application Name: ").append(applicationName).append("\n")
+                    .append("Alerts for the URL: ").append(currentUrl).append("\n")
+                    .append("Expected Response Code: ").append(expectedResponseCode).append("\n")
+                    .append("Actual Response Code: ").append(responseCode).append("\n")
+                    .append("Response Time: ").append(responseTime).append(" ms\n")
+                    .append("-------------------------------------------------\n")
+                    .append("Details:\n");
+
+            // Check response time
+            if (responseTime > expectedResponseTime) {
+                logger.warn("Response time exceeded the expected range.");
+                emailBody.append("The response time exceeded the expected time.\n");
+            } else {
+                logger.info("Response time is within the expected range.");
+            }
+
+            // Check response code
+            logger.info("Response Code: " + responseCode);
+            if (responseCode == expectedResponseCode) {
+                logger.info("Response code matches the expected code.");
+            } else {
+                logger.warn("Response code does not match the expected code.");
+                emailBody.append("The response code did not match the expected code.\n" +
+                        "Expected Response Code: " + expectedResponseCode + "\n" +
+                        "Actual Response Code: " + responseCode + "\n");
+            }
+
+            // Check expected content
+            String pageSource = driver.getPageSource();
+            boolean isMatchFound = false;
+            for (String expectedName : expectedResponse) {
+                if (pageSource.contains(expectedName)) {
+                    logger.info("Match found in HTML: " + expectedName);
+                    isMatchFound = true;
+                    break;
+                }
+            }
+
+            if (!isMatchFound) {
+                logger.warn("Expected result does not match: No names are present in the page's HTML content.");
+                emailBody.append("None of the expected content was found on the page.\n");
+                alertTriggered = true;
+            }
+
+            // Send email if alerts are raised
+            if (alertTriggered) {
+                sendEmail("Alert Notification", emailBody.toString());
+            }
+
+            logger.info("===================================================");
+
+        } catch (TimeoutException e) {
+            logger.error("Timeout while trying to load URL: " + baseUrl + ". Exception: " + e.getMessage());
+            emailBody.append("Error: Timeout occurred while trying to load the URL ").append(baseUrl).append("\n");
+            alertTriggered = true;
+        } catch (WebDriverException e) {
+            logger.error("Error accessing URL: " + baseUrl + ". Exception: " + e.getMessage());
+            emailBody.append("Error: Unable to access the URL ").append(baseUrl).append("\n");
+            alertTriggered = true;
+        } finally {
+            if (alertTriggered) {
+                sendEmail("Critical Error Notification", emailBody.toString());
             }
         }
-
-        if (!isMatchFound) {
-            logger.warning("Expected result does not match: No names are present in the page's HTML content.");
-            emailBody.append("None of the expected content was found on the page.\n");
-        } else {
-            logger.info("Expected result matches: At least one name is present in the page's HTML content.");
-        }
-
-        // Send email if alerts are raised
-        if (emailBody.length() > 0) {
-            emailBody.insert(0, "Alerts for the URL: " + currentUrl + "\n\n");
-            sendEmail("Alert Notification", emailBody.toString());
-        }
-
-        logger.info("===========================");
     }
 
 
@@ -210,7 +265,7 @@ public class SyntheticMonitoring {
         try {
             String loginType = (String) entry.getOrDefault("loginType", "singleStep");
             if (!entry.containsKey("credentials")) {
-                logger.severe("No credentials provided for a URL that requires login.");
+                logger.error("No credentials provided for a URL that requires login.");
                 return;
             }
 
@@ -233,11 +288,11 @@ public class SyntheticMonitoring {
                     threeStepLogin(credentials, decryptedUsername, decryptedPassword);
                     break;    
                 default:
-                    logger.warning("Unknown login type, defaulting to single-step.");
+                    logger.warn("Unknown login type, defaulting to single-step.");
                     inputCredentials(credentials, decryptedUsername, decryptedPassword);
             }
         } catch (Exception e) {
-            logger.severe("Error loading credentials: " + e.getMessage());
+            logger.error("Error loading credentials: " + e.getMessage());
         }
     }
 
@@ -245,18 +300,18 @@ public class SyntheticMonitoring {
         try {
             WebElement usernameField = driver.findElement(getLocator(credentialLocators, "usernameLocator"));
             usernameField.sendKeys(username);
-            logger.info("Username entered: " + username);
+            logger.info("Username entered successfully");
 
             WebElement passwordField = driver.findElement(getLocator(credentialLocators, "passwordLocator"));
             passwordField.sendKeys(password);
-            logger.info("Password entered: " + password);
+            logger.info("Password entered successfully");
 
             WebElement loginButton = driver.findElement(getLocator(credentialLocators, "submitLocator"));
             loginButton.click();
-            logger.info("Login button clicked.");
+            logger.info("Login button clicked successfully");
 
         } catch (NoSuchElementException e) {
-            logger.severe("Element not found during login: " + e.getMessage());
+            logger.error("Element not found during login: " + e.getMessage());
         }
     }
 
@@ -264,24 +319,24 @@ public class SyntheticMonitoring {
         try {
             WebElement usernameField = driver.findElement(getLocator(credentialLocators, "usernameLocator"));
             usernameField.sendKeys(username);
-            logger.info("Username entered: " + username);
+            logger.info("Username entered successfully");
 
             WebElement nextButton = driver.findElement(getLocator(credentialLocators, "nextLocator"));
             nextButton.click();
-            logger.info("Next button clicked.");
+            logger.info("Next button clicked successfully");
 
             Thread.sleep(2000); // Wait for the password field
 
             WebElement passwordField = driver.findElement(getLocator(credentialLocators, "passwordLocator"));
             passwordField.sendKeys(password);
-            logger.info("Password entered: " + password);
+            logger.info("Password entered successfully");
 
             WebElement loginButton = driver.findElement(getLocator(credentialLocators, "submitLocator"));
             loginButton.click();
-            logger.info("Submit button clicked.");
+            logger.info("Login button clicked successfully");
 
         } catch (NoSuchElementException | InterruptedException e) {
-            logger.severe("Element not found during multi-step login: " + e.getMessage());
+            logger.error("Element not found during multi-step login: " + e.getMessage());
         }
     }
     
@@ -299,20 +354,20 @@ public class SyntheticMonitoring {
             // Enter the username
             WebElement usernameField = driver.findElement(getLocator(credentialLocators, "usernameLocator"));
             usernameField.sendKeys(username);
-            logger.info("Username entered: " + username);
+            logger.info("Username entered successfully");
 
             // Enter the password
             WebElement passwordField = driver.findElement(getLocator(credentialLocators, "passwordLocator"));
             passwordField.sendKeys(password);
-            logger.info("Password entered: " + password);
+            logger.info("Password entered successfully");
 
             // Click the login button
             WebElement loginButton = driver.findElement(getLocator(credentialLocators, "submitLocator"));
             loginButton.click();
-            logger.info("Login button clicked.");
+            logger.info("Login button clicked successfully");
 
         } catch (NoSuchElementException e) {
-            logger.severe("Element not found during three-step login: " + e.getMessage());
+            logger.error("Element not found during three-step login: " + e.getMessage());
         }
     }
     
@@ -344,7 +399,7 @@ public class SyntheticMonitoring {
             byte[] decryptedBytes = cipher.doFinal(Base64.getDecoder().decode(encryptedData));
             return new String(decryptedBytes);
         } catch (Exception e) {
-            logger.severe("Error decrypting data: " + e.getMessage());
+            logger.error("Error decrypting data: " + e.getMessage());
             return null;
         }
     }
@@ -366,7 +421,7 @@ public class SyntheticMonitoring {
 			String adminEmail = emailProps.getProperty("admin.email");
 
 			if (username == null || encryptedPassword == null || smtpHost == null || adminEmail == null) {
-				logger.severe("One or more email credentials are missing or null. Please check the properties file.");
+				logger.error("One or more email credentials are missing or null. Please check the properties file.");
 				return;
 			}
 
@@ -389,24 +444,17 @@ public class SyntheticMonitoring {
 			Message message = new MimeMessage(session);
 			message.setFrom(new InternetAddress(username));
 			message.setRecipients(Message.RecipientType.TO, InternetAddress.parse(adminEmail));
-			message.setSubject(subject);
+			message.setSubject("URL Monitoring");
 			message.setText(body);
 
 			Transport.send(message);
 			logger.info("Email sent successfully to " + adminEmail);
 		} catch (Exception e) {
-			logger.severe("Failed to send email: " + e.getMessage());
+			logger.error("Failed to send email: " + e.getMessage());
 		}
 	}
 
-
-    private static void setupLogger() throws IOException {
-		FileHandler fileHandler = new FileHandler("E:\\MultiSynthetic\\syntheticlog.log", false);
-		logger.addHandler(fileHandler);
-		SimpleFormatter formatter = new SimpleFormatter();
-		fileHandler.setFormatter(formatter);
-		logger.setUseParentHandlers(false);
-	}
+   
     public static class UrlMonitoringJob implements Job {
         @Override
         public void execute(JobExecutionContext context) throws JobExecutionException {
@@ -414,7 +462,7 @@ public class SyntheticMonitoring {
             try {
                 syntheticMonitoring.monitorUrls();
             } catch (InterruptedException | IOException e) {
-                logger.severe("Job execution failed: " + e.getMessage());
+                logger.error("Job execution failed: " + e.getMessage());
             }
         }
     }

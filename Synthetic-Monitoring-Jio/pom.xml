@@ -8,7 +8,7 @@
    <dependencies>
 		<!--
 		https://mvnrepository.com/artifact/org.seleniumhq.selenium/selenium-java -->
-		<dependency>
+<dependency>
     <groupId>org.seleniumhq.selenium</groupId>
     <artifactId>selenium-java</artifactId>
     <version>4.25.0</version> <!-- or the latest version available -->
@@ -45,9 +45,8 @@
     <groupId>com.sun.mail</groupId>
     <artifactId>javax.mail</artifactId>
     <version>1.6.2</version>
-</dependency>
+</dependency> 
 
- 
 		<dependency>
 			<groupId>org.json</groupId>
 			<artifactId>json</artifactId>
@@ -64,20 +63,51 @@
     <artifactId>jackson-databind</artifactId>
     <version>2.14.0</version>
 </dependency>
+
   <dependency>
     <groupId>ch.qos.logback</groupId>
     <artifactId>logback-classic</artifactId>
-    <version>1.4.5</version> <!-- or the latest version -->
+    <version>1.4.11</version> <!-- or the latest version -->
 </dependency>
+
 <dependency>
+
     <groupId>org.apache.logging.log4j</groupId>
-    <artifactId>log4j-slf4j-impl</artifactId>
-    <version>2.20.0</version> <!-- or the latest version -->
+
+    <artifactId>log4j-core</artifactId>
+
+    <version>2.19.0</version>
+
 </dependency>
-		
+
+<!-- https://mvnrepository.com/artifact/org.apache.logging.log4j/log4j-api -->
+<dependency>
+
+    <groupId>org.apache.logging.log4j</groupId>
+
+    <artifactId>log4j-api</artifactId>
+
+    <version>2.19.0</version>
+
+</dependency>
 
 
 	</dependencies>
+	
+	  <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.10.1</version>
+                <configuration>
+                    <source>21</source> <!-- Set the desired Java version here -->
+                    <target>21</target>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+  
   
   
   

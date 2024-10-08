@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="DEBUG"> <!-- Status set to DEBUG for better insights -->
+    <Appenders>
+        <Console name="Console" target="SYSTEM_OUT">
+            <PatternLayout pattern="%d{HH:mm:ss.SSS} %-5level - %msg%n"/>
+        </Console>
+        <RollingFile name="RollingFile" fileName="E:/MultiSynthetic/logs/synthetic-monitoring.log"
+                     filePattern="E:/MultiSynthetic/logs/synthetic-monitoring-%i.log.gz" append="true"> <!-- Changed to RollingFile to support maxFileSize -->
+            <PatternLayout>
+                <Pattern>%d{HH:mm:ss.SSS} [%t] %-5level - %msg%n</Pattern>
+            </PatternLayout>
+            <Policies>
+                <SizeBasedTriggeringPolicy size="5MB"/> <!-- Max file size set to 10MB -->
+            </Policies>
+            <DefaultRolloverStrategy max="30"/> <!-- Max history set to 30 -->
+        </RollingFile>
+    </Appenders>
+
+    <Loggers>
+        <Logger name="com.sdetadda" level="debug" additivity="true"> <!-- Set to DEBUG level -->
+            <AppenderRef ref="Console"/>
+        </Logger>
+        <Root level="debug"> <!-- Set to DEBUG level -->
+            <AppenderRef ref="RollingFile"/> <!-- Refer to RollingFile instead of File -->
+        </Root>
+    </Loggers>
+</Configuration>
